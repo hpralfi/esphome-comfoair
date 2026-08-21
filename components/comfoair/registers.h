@@ -131,7 +131,8 @@ Byte[0] = 0x00 = Without connection
           0x03 = PC master
           0x04 = PC log mode
 */
-#define CMD_SET_RS232_MODE 0x9B
+#define CMD_SET_RS232_MODE 0x9B // implemented
+#define CMD_SET_RS232_MODE_LENGTH 1
 #define RES_SET_RS232_MODE 0x9C // todo missing
 
 // ======================================================================

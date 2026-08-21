@@ -329,6 +329,11 @@ public:
 
   void set_level(int level) { set_level_(level); }
   void set_comfort_temperature(float temperature) { set_comfort_temperature_(temperature); }
+  // Sets the RS232 mode of the unit (command 0x9B). Useful when a ComfoSense
+  // or CC-Ease panel is still wired up but should stay silent, so that this
+  // component is the only master on the bus.
+  //   0 = end, 1 = PC only (panel disabled), 3 = PC master, 4 = PC log mode
+  void set_rs232_mode(uint8_t mode) { set_rs232_mode_(mode); }
 
 protected:
   // --- setter ---
@@ -338,6 +343,22 @@ protected:
     uint8_t reset_cmd[CMD_RESET_AND_SELF_TEST_LENGTH] = {errors ? (uint8_t)1 : (uint8_t)0, 0, 0,
                                                          filters ? (uint8_t)1 : (uint8_t)0};
     write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
+  }
+
+  void set_rs232_mode_(uint8_t mode)
+  {
+    // 2 means "CC-Ease only" and is a status value, not a valid request.
+    if (mode > 4 || mode == 2)
+    {
+      ESP_LOGI(TAG, "Ignoring invalid RS232 mode request: %u", mode);
+      return;
+    }
+
+    ESP_LOGI(TAG, "Setting RS232 mode to: %u", mode);
+    {
+      uint8_t command[CMD_SET_RS232_MODE_LENGTH] = {mode};
+      write_command_(CMD_SET_RS232_MODE, command, sizeof(command));
+    }
   }
 
   void set_level_(int level)
