@@ -333,6 +333,9 @@ public:
   // or CC-Ease panel is still wired up but should stay silent, so that this
   // component is the only master on the bus.
   //   0 = end, 1 = PC only (panel disabled), 3 = PC master, 4 = PC log mode
+  // Observed on a CA350 with firmware 3.20: mode 1 is acknowledged but ignored,
+  // mode 3 is accepted and turns the CC-Ease dark, mode 0 from mode 3 returns
+  // to 2 (CC-Ease only, panel active). The unit stays controllable in mode 2.
   void set_rs232_mode(uint8_t mode) { set_rs232_mode_(mode); }
 
 protected:
@@ -357,9 +360,20 @@ protected:
     ESP_LOGI(TAG, "Setting RS232 mode to: %u", mode);
     {
       uint8_t command[CMD_SET_RS232_MODE_LENGTH] = {mode};
+      // Mark the request so the next ACK and the 0x9C reply get logged.
+      rs232_mode_pending_ = true;
       write_command_(CMD_SET_RS232_MODE, command, sizeof(command));
     }
   }
+
+  bool rs232_mode_pending_ = false;
+  // Last mode reported by the unit (0x9C), 0xFF = not yet known
+  uint8_t rs232_mode_ = 0xFF;
+
+public:
+  uint8_t get_rs232_mode() const { return rs232_mode_; }
+
+protected:
 
   void set_level_(int level)
   {
@@ -728,6 +742,21 @@ protected:
 
     switch (msg_command_u8)
     {
+    case RES_SET_RS232_MODE:
+      // Reply to 0x9B: current mode (0 = none, 1 = PC only, 2 = CC-Ease only,
+      // 3 = PC master, 4 = PC log mode).
+      // The unit also sends this unsolicited every few seconds in mode 2 and 4,
+      // so only log replies to a request and actual changes.
+      if (msg_length_u8 > 0 && (rs232_mode_pending_ || msg_data[0] != rs232_mode_))
+      {
+        ESP_LOGI(TAG, "RS232 mode reported by unit: %u", msg_data[0]);
+      }
+      if (msg_length_u8 > 0)
+      {
+        rs232_mode_ = msg_data[0];
+      }
+      rs232_mode_pending_ = false;
+      break;
     case RES_GET_BOOTLOADER_VERSION:
       memcpy(bootloader_version_, msg_data, std::min<size_t>(msg_length_u8, sizeof(bootloader_version_)));
       break;
